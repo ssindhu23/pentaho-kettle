@@ -3,7 +3,7 @@
  *
  * Pentaho Data Integration
  *
- * Copyright (C) 2002-2023 by Hitachi Vantara : http://www.pentaho.com
+ * Copyright (C) 2002-2024 by Hitachi Vantara : http://www.pentaho.com
  *
  *******************************************************************************
  *
@@ -287,6 +287,8 @@ import org.pentaho.di.ui.spoon.partition.processor.MethodProcessor;
 import org.pentaho.di.ui.spoon.partition.processor.MethodProcessorFactory;
 import org.pentaho.di.ui.spoon.trans.TransGraph;
 import org.pentaho.di.ui.spoon.tree.TreeManager;
+import org.pentaho.di.ui.spoon.tree.extension.TreePaneExtension;
+import org.pentaho.di.ui.spoon.tree.extension.TreePaneManager;
 import org.pentaho.di.ui.spoon.tree.provider.ClustersFolderProvider;
 import org.pentaho.di.ui.spoon.tree.provider.DBConnectionFolderProvider;
 import org.pentaho.di.ui.spoon.tree.provider.HopsFolderProvider;
@@ -376,6 +378,12 @@ import java.util.Objects;
 public class Spoon extends ApplicationWindow implements AddUndoPositionInterface, TabListener, SpoonInterface,
   OverwritePrompter, PDIObserver, LifeEventHandler, XulEventSource, XulEventHandler, PartitionSchemasProvider {
   private static final String userHomeDir = System.getProperty( "user.home" );
+  /**
+   * Separate VFS connection name variable is no longer needed.
+   * @deprecated
+   * The connection name is in the URI since full {@value org.pentaho.di.connections.vfs.provider.ConnectionFileProvider#SCHEME } paths are being used.
+   */
+  @Deprecated
   public static final String CONNECTION = "connection";
   private static final String XML_EXTENSION = "xml";
   public static final String SPOON_DIALOG_PROMPT_OVERWRITE_FILE = "Spoon.Dialog.PromptOverwriteFile.";
@@ -622,6 +630,8 @@ public class Spoon extends ApplicationWindow implements AddUndoPositionInterface
   private TreeManager selectionTreeManager;
 
   public Text selectionFilter;
+
+  private TreePaneManager viewTabPanes = new TreePaneManager();
 
   // licensing related property so that Revenera can properly identify execution is triggered by spoon
   private static final String EXECUTION_TYPE_PROP = "system-property.pentaho.execution.type";
@@ -889,10 +899,9 @@ public class Spoon extends ApplicationWindow implements AddUndoPositionInterface
       mainSpoonContainer.getDocumentRoot().getElementById( "trans-job-canvas" );
       deck = (SwtDeck) mainSpoonContainer.getDocumentRoot().getElementById( "canvas-deck" );
 
-      final Composite tempSashComposite = new Composite( shell, SWT.None );
-      sashComposite = tempSashComposite;
+      sashComposite = new Composite( shell, SWT.None );
 
-      mainPerspective = new MainSpoonPerspective( tempSashComposite, tabfolder );
+      mainPerspective = new MainSpoonPerspective( sashComposite, tabfolder );
       if ( startupPerspective == null ) {
         startupPerspective = mainPerspective.getId();
       }
@@ -1969,8 +1978,13 @@ public class Spoon extends ApplicationWindow implements AddUndoPositionInterface
     }
   }
 
-  private void addViewTab( CTabFolder tabFolder ) {
-    Composite viewComposite = new Composite( tabFolder, SWT.NONE );
+  /** Add a pane to the view tab */
+  public void registerViewTabPane( TreePaneExtension extension ) throws KettleException {
+    viewTabPanes.addPane( extension );
+  }
+
+  private Composite addViewTree( Composite parent ) {
+    Composite viewComposite = new Composite( parent, SWT.NONE );
     viewComposite.setLayout( new FormLayout()  );
     viewComposite.setBackground( GUIResource.getInstance().getColorDemoGray() );
 
@@ -2005,11 +2019,6 @@ public class Spoon extends ApplicationWindow implements AddUndoPositionInterface
       }
     } );
 
-    view = new CTabItem( tabFolder, SWT.NONE );
-    view.setControl( viewComposite );
-    view.setText( STRING_SPOON_MAIN_TREE );
-    view.setImage( GUIResource.getInstance().getImageExploreSolutionSmall() );
-
     viewTreeComposite = new Composite( viewComposite, SWT.NONE );
     viewTreeComposite.setLayout( new FillLayout() );
 
@@ -2026,6 +2035,30 @@ public class Spoon extends ApplicationWindow implements AddUndoPositionInterface
     fdViewComposite.right = new FormAttachment( 100 );
     fdViewComposite.bottom = new FormAttachment( 100 );
     viewComposite.setLayoutData( fdViewComposite );
+
+    return viewComposite;
+  }
+
+  private void addViewTab( CTabFolder tabFolder ) {
+    try {
+      registerViewTabPane( ( Composite viewComposite, TreePaneExtension.ExpandController ignored ) -> {
+        viewComposite.setLayout( new FormLayout() );
+        addViewTree( viewComposite );
+        return true;
+      } );
+    } catch ( KettleException e ) {
+      // should never happen here
+      log.logError( e.getLocalizedMessage(), e );
+    }
+
+    SashForm mainViewComposite = new SashForm( tabFolder, SWT.VERTICAL | SWT.BORDER );
+    // build view along with any other registered extensions
+    viewTabPanes.buildPanes( mainViewComposite );
+
+    view = new CTabItem( tabFolder, SWT.NONE );
+    view.setControl( mainViewComposite );
+    view.setText( STRING_SPOON_MAIN_TREE );
+    view.setImage( GUIResource.getInstance().getImageExploreSolutionSmall() );
   }
 
   private void addDesignTab( CTabFolder tabFolder ) {
@@ -4603,6 +4636,12 @@ public class Spoon extends ApplicationWindow implements AddUndoPositionInterface
     }
   }
 
+  /**
+   * Separate VFS connection name variable is no longer needed.
+   * @deprecated
+   * The connection name is in the URI since full {@value org.pentaho.di.connections.vfs.provider.ConnectionFileProvider#SCHEME } paths are being used.
+   */
+  @Deprecated
   private String lastFileOpenedConnection;
   private String lastFileOpenedProvider;
 
@@ -4656,7 +4695,7 @@ public class Spoon extends ApplicationWindow implements AddUndoPositionInterface
         // We are able to find the index of forward or backward slash set the folder to be the path before slash
         String folder = lastFileOpened.substring( 0, parentIndex );
         fileDialogOperation.setPath( folder );
-        fileDialogOperation.setConnection( lastFileOpenedConnection );
+        fileDialogOperation.setConnection( null );
         fileDialogOperation.setProvider( lastFileOpenedProvider );
       } else {
         // We were unable to find the folder path from the last file opened. We will set the file open dialog to
@@ -4687,7 +4726,7 @@ public class Spoon extends ApplicationWindow implements AddUndoPositionInterface
         openFile( path, variables, importFile );
         lastFileOpened = path;
         props.setLastUsedLocalFile( path );
-        lastFileOpenedConnection = fileDialogOperation.getConnection();
+        lastFileOpenedConnection = null;
         lastFileOpenedProvider = fileDialogOperation.getProvider();
       }
     } catch ( KettleException e ) {
@@ -4780,7 +4819,7 @@ public class Spoon extends ApplicationWindow implements AddUndoPositionInterface
       setFileOperatioPathForNonRepositoryFile(fileDialogOperation, meta, export );
     }
     if ( meta instanceof VariableSpace ) {
-      fileDialogOperation.setConnection( ( (VariableSpace) meta ).getVariable( CONNECTION ) );
+      fileDialogOperation.setConnection( null );
     }
     boolean saved = false;
     try {
@@ -4795,7 +4834,7 @@ public class Spoon extends ApplicationWindow implements AddUndoPositionInterface
         String filename = fileDialogOperation.getPath() + File.separator + fileDialogOperation.getFilename();
         lastFileOpened = filename;
         props.setLastUsedLocalFile( filename );
-        lastFileOpenedConnection = fileDialogOperation.getConnection();
+        lastFileOpenedConnection = null;
         lastFileOpenedProvider = fileDialogOperation.getProvider();
         if ( lastFileOpenedConnection != null && meta instanceof VariableSpace ) {
           ( (VariableSpace) meta ).setVariable( CONNECTION, lastFileOpenedConnection );
@@ -5815,7 +5854,7 @@ public class Spoon extends ApplicationWindow implements AddUndoPositionInterface
       if (fileDialogOperation.getPath() != null && fileDialogOperation.getFilename() != null) {
         zipFilename = fileDialogOperation.getPath() + File.separator + fileDialogOperation.getFilename();
         lastFileOpened = zipFilename;
-        lastFileOpenedConnection = fileDialogOperation.getConnection();
+        lastFileOpenedConnection = null;
         lastFileOpenedProvider = fileDialogOperation.getProvider();
         FileObject zipFileObject = KettleVFS.getFileObject(zipFilename);
         if (zipFileObject.exists()) {
