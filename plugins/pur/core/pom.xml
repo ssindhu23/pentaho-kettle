@@ -200,7 +200,7 @@
       </exclusions>
     </dependency>
     <dependency>
-      <groupId>javax.servlet</groupId>
+      <groupId>jakarta.servlet</groupId>
       <artifactId>servlet-api</artifactId>
       <version>${servlet-api.version}</version>
       <scope>provided</scope>

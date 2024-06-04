@@ -87,7 +87,7 @@ import org.pentaho.di.core.row.ValueMetaInterface;
 import org.pentaho.di.core.row.value.ValueMetaNumber;
 import org.pentaho.di.core.variables.VariableSpace;
 import org.pentaho.di.junit.rules.RestorePDIEnvironment;
-import org.springframework.mock.jndi.SimpleNamingContextBuilder;
+//import org.springframework.mock.jndi.SimpleNamingContextBuilder;
 
 @SuppressWarnings( "deprecation" )
 public class DatabaseTest {
@@ -125,20 +125,20 @@ public class DatabaseTest {
     KettleClientEnvironment.init();
   }
 
-  @Before
-  public void setUp() throws Exception {
-    conn = mockConnection( mock( DatabaseMetaData.class ) );
-    when( log.getLogLevel() ).thenReturn( LogLevel.NOTHING );
-    when( dbMetaMock.getDatabaseInterface() ).thenReturn( databaseInterface );
-    if ( !NamingManager.hasInitialContextFactoryBuilder() ) {
-      // If JNDI is not initialized, use simpleJNDI
-      System.setProperty( Context.INITIAL_CONTEXT_FACTORY,
-        "org.osjava.sj.memory.MemoryContextFactory" ); // pentaho#simple-jndi;1.0.0
-      System.setProperty( "org.osjava.sj.jndi.shared", "true" );
-      InitialContextFactoryBuilder simpleBuilder = new SimpleNamingContextBuilder();
-      NamingManager.setInitialContextFactoryBuilder( simpleBuilder );
-    }
-  }
+//  @Before
+//  public void setUp() throws Exception {
+//    conn = mockConnection( mock( DatabaseMetaData.class ) );
+//    when( log.getLogLevel() ).thenReturn( LogLevel.NOTHING );
+//    when( dbMetaMock.getDatabaseInterface() ).thenReturn( databaseInterface );
+//    if ( !NamingManager.hasInitialContextFactoryBuilder() ) {
+//      // If JNDI is not initialized, use simpleJNDI
+//      System.setProperty( Context.INITIAL_CONTEXT_FACTORY,
+//        "org.osjava.sj.memory.MemoryContextFactory" ); // pentaho#simple-jndi;1.0.0
+//      System.setProperty( "org.osjava.sj.jndi.shared", "true" );
+//      InitialContextFactoryBuilder simpleBuilder = new SimpleNamingContextBuilder();
+//      NamingManager.setInitialContextFactoryBuilder( simpleBuilder );
+//    }
+//  }
 
   @After
   public void tearDown() throws NamingException {
